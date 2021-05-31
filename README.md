@@ -8,20 +8,20 @@ This repository contains Smart Contract code in Solidity (using Truffle), tests 
 
 To install, download or clone the repo, then:
 
-`npm install`
-`truffle compile`
+`npm install`  
+`truffle compile`  
 `ganache-cli -m "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat" --accounts=50`
 
 ## Develop Client
 
 To run truffle tests:
 
-`truffle test ./test/flightSurety.js`
+`truffle test ./test/flightSurety.js`  
 `truffle test ./test/oracles.js`
 
 To use the dapp:
 
-`truffle migrate`
+`truffle migrate`  
 `npm run dapp`
 
 To view dapp:
@@ -30,12 +30,12 @@ To view dapp:
 
 ## Develop Server
 
-`npm run server`
+`npm run server`  
 `truffle test ./test/oracles.js`
 
 ## Deploy
 
-To build dapp for prod:
+To build dapp for prod:  
 `npm run dapp:prod`
 
 Deploy the contents of the ./dapp folder

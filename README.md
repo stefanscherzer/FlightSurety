@@ -10,6 +10,7 @@ To install, download or clone the repo, then:
 
 `npm install`
 `truffle compile`
+`ganache-cli -m "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat" --accounts=50`
 
 ## Develop Client
 

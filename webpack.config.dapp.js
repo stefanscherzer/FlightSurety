@@ -33,6 +33,7 @@ module.exports = {
   },
   plugins: [
     new HtmlWebpackPlugin({ 
+      favicon: path.join(__dirname, "src/dapp/favicon.ico"),
       template: path.join(__dirname, "src/dapp/index.html")
     })
   ],

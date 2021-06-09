@@ -12,6 +12,8 @@ import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 contract FlightSuretyApp {
     using SafeMath for uint256; // Allow SafeMath functions to be called for all uint256 types (similar to "prototype" in Javascript)
 
+    FlightSuretyData flightSuretyData;
+
     /********************************************************************************************/
     /*                                       DATA VARIABLES                                     */
     /********************************************************************************************/
@@ -26,15 +28,35 @@ contract FlightSuretyApp {
 
     address private contractOwner;          // Account used to deploy contract
 
-    struct Flight {
-        bool isRegistered;
-        uint8 statusCode;
-        uint256 updatedTimestamp;        
-        address airline;
-    }
-    mapping(bytes32 => Flight) private flights;
+    // struct Flight {
+    //     bool isRegistered;
+    //     uint8 statusCode;
+    //     uint256 updatedTimestamp;        
+    //     address airline;
+    // }
+    // mapping(bytes32 => Flight) private flights;
 
+    uint256 public constant airlineFee = 10 ether;
+    uint256 public constant insuranceFee = 1 ether;
  
+    /********************************************************************************************/
+    /*                                       CONSTRUCTOR                                        */
+    /********************************************************************************************/
+
+    /**
+    * @dev Contract constructor
+    *
+    */
+    constructor
+                                (
+                                    address dataContract
+                                ) 
+                                public 
+    {
+        contractOwner = msg.sender;
+        flightSuretyData = FlightSuretyData(dataContract);
+    }
+
     /********************************************************************************************/
     /*                                       FUNCTION MODIFIERS                                 */
     /********************************************************************************************/
@@ -50,7 +72,7 @@ contract FlightSuretyApp {
     modifier requireIsOperational() 
     {
          // Modify to call data contract's status
-        require(true, "Contract is currently not operational");  
+        require(flightSuretyData.isOperational() == true, "Contract is currently not operational");  
         _;  // All modifiers require an "_" which indicates where the function body will be added
     }
 
@@ -63,67 +85,271 @@ contract FlightSuretyApp {
         _;
     }
 
-    /********************************************************************************************/
-    /*                                       CONSTRUCTOR                                        */
-    /********************************************************************************************/
-
-    /**
-    * @dev Contract constructor
-    *
-    */
-    constructor
-                                (
-                                ) 
-                                public 
+    modifier requireRegisteredAirline(address airlineAddress)
     {
-        contractOwner = msg.sender;
+        (bool registered, bool haspaid, uint256 votes) = flightSuretyData.isRegisteredAirline(airlineAddress);
+        require(registered == true, "Airline is not registered");
+        require(haspaid == true,"Airline has not paid the registration fee yet");
+        _;
     }
+
+    // Define a modifier that checks if the paid amount is sufficient to cover the price
+    modifier paidEnough(uint referenceValue)
+    {
+        require(msg.value >= referenceValue, "The value provided is not enough!");
+        _;
+    }
+
+    // Define a modifier that checks the price and refunds the remaining balance
+    modifier checkValue(uint price, address addressToFund)
+    {
+        uint amountToReturn = msg.value - price;
+        addressToFund.transfer(amountToReturn);
+        _;
+    }
+
+    modifier checkVoter(address airline, address voter)
+    {
+        bool hasVoted = flightSuretyData.hasAlreadyVoted(airline, voter);
+        require(hasVoted == true, "Voter has already voted for this airline"); // == false
+        _;
+    } 
+
 
     /********************************************************************************************/
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
 
     function isOperational() 
-                            public 
-                            pure 
+                            external
                             returns(bool) 
     {
-        return true;  // Modify to call data contract's status
+        return flightSuretyData.isOperational();
+    }
+
+    function getRegistrationCount() 
+                                external
+                                requireIsOperational
+                                returns(uint256)
+    {
+        return flightSuretyData.getRegistrationCount();
+    }
+
+    function getConsensusCount() 
+                                external
+                                requireIsOperational
+                                returns(uint256)
+    {
+        return flightSuretyData.getConsensusCount();
+    }
+
+    function isRegisteredAirline
+                            (
+                                address airlineAddress
+                            ) 
+                            external
+                            requireIsOperational
+                            returns(bool registered,bool hasPaid, uint256 votes)
+    {
+        return flightSuretyData.isRegisteredAirline(airlineAddress);
+    }
+
+    function contractTime() 
+                        external 
+                        view
+                        returns(uint256)
+    {
+        return (now);
+    }
+
+    function getFlightStatus
+                        (
+                            string flight,
+                            uint256 timestamp, 
+                            address airline
+                        ) 
+                        external
+                        requireIsOperational
+                        returns(bool exist, uint256 status, bool registered, uint256 departuretime, uint256 price)
+    {
+        bytes32 key = getFlightKey(airline, flight, timestamp);
+        return flightSuretyData.getFlight(key);
     }
 
     /********************************************************************************************/
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
 
-  
+    function airlineRegistration
+                            (
+                                address newAirline
+                            ) 
+                            external
+                            requireIsOperational
+                            checkVoter(newAirline, msg.sender)
+                            requireRegisteredAirline(msg.sender)
+    {
+        (bool registered, bool haspaid, uint256 votes) = flightSuretyData.isRegisteredAirline(newAirline);
+        require(registered == false, "Airline is registered already");
+
+        if (flightSuretyData.getRegistrationCount() <= 4) {
+            flightSuretyData.changeRegistration(newAirline, true);
+        } else { 
+            flightSuretyData.addVote(newAirline, msg.sender);
+            uint256 consensusCount = flightSuretyData.getConsensusCount();
+            
+            if (votes >= consensusCount){
+                flightSuretyData.changeRegistration(newAirline, true);
+            }
+        }
+    }
+
+    function payRegistrationFee() 
+                            external 
+                            payable
+                            requireIsOperational
+                            paidEnough(airlineFee)
+                            checkValue(airlineFee, msg.sender)
+    {
+        require(flightSuretyData.hasPaid(msg.sender) == false, "Airline has already paid the fee");
+        address(flightSuretyData).transfer(msg.value);
+        flightSuretyData.payFee(msg.sender);
+    }
+
+
+    function registerFlight
+                        (
+                            string flight, 
+                            uint256 timestamp, 
+                            uint256 price
+                        ) 
+                        external
+                        requireIsOperational
+                        requireRegisteredAirline(msg.sender)
+    {
+        bytes32 key = getFlightKey(msg.sender, flight, timestamp);
+        flightSuretyData.addRegisteredFlight(key, price, timestamp);
+    }
+
+    function getTicketPrice
+                        (
+                            string flight,
+                            uint256 timestamp, 
+                            address airline
+                        ) 
+                        external 
+                        requireIsOperational
+                        returns(uint256, uint256)
+    {
+        bytes32 key = getFlightKey(airline, flight, timestamp);
+        return flightSuretyData.getTicketPriceWithInsurance(key);
+    }
+
+    function buyTicket
+                    (
+                        string flight,
+                        uint256 timestamp, 
+                        address airline,
+                        bool insured
+                    ) 
+                    external 
+                    payable
+                    requireIsOperational
+    {
+        uint256  amountToReturn;
+        bytes32 key = getFlightKey(airline, flight, timestamp);
+        (uint256 ticketPrice, uint256 ticketPriceInsured) = flightSuretyData.getTicketPriceWithInsurance(key);
+
+        if (insured == true) {
+            require (msg.value >= ticketPriceInsured, "Need more Ether to buy ticket with insurance");
+            amountToReturn = msg.value.sub(ticketPriceInsured);
+            msg.sender.transfer(amountToReturn);
+            address(flightSuretyData).transfer(ticketPriceInsured);
+            flightSuretyData.buy(key,msg.sender,insured);
+        } else {
+            require (msg.value >= ticketPrice, "Need more Ether to buy ticket");
+            amountToReturn = msg.value.sub(ticketPrice);
+            msg.sender.transfer(amountToReturn);
+            address(flightSuretyData).transfer(ticketPrice);
+            flightSuretyData.buy(key,msg.sender,insured);
+        }
+    }
+
+    function receiveCredit() 
+                        external
+                        requireIsOperational
+    {
+        flightSuretyData.pay(msg.sender);
+    }
+
+    function isInsured
+                    (
+                        string flight,
+                        uint256 timestamp, 
+                        address airline
+                    ) 
+                    external 
+                    requireIsOperational
+                    returns(bool)
+    {
+        bytes32 key = getFlightKey(airline, flight, timestamp);
+        return flightSuretyData.isInsured(key, msg.sender);
+    }
+
+    function getCredit
+                    (
+                        string flight,
+                        uint256 timestamp, 
+                        address airline
+                    ) 
+                    external
+                    requireIsOperational
+    {
+        bytes32 key = getFlightKey(airline, flight, timestamp);
+        flightSuretyData.fund(key, msg.sender);
+    }
+
+    function creditAmount() 
+                        external 
+                        requireIsOperational
+                        returns (uint256)
+    {
+        return flightSuretyData.creditInsurees(msg.sender);
+    }
+
+
+
+
    /**
     * @dev Add an airline to the registration queue
     *
     */   
-    function registerAirline
-                            (   
-                            )
-                            external
-                            pure
-                            returns(bool success, uint256 votes)
-    {
-        return (success, 0);
-    }
+    // function registerAirline
+    //                         (   
+    //                         )
+    //                         external
+    //                         pure
+    //                         returns(bool success, uint256 votes)
+    // {
+    //     return (success, 0);
+    // }
 
 
    /**
     * @dev Register a future flight for insuring.
     *
     */  
-    function registerFlight
-                                (
-                                )
-                                external
-                                pure
-    {
+    // function registerFlight
+    //                             (
+    //                             )
+    //                             external
+    //                             pure
+    // {
 
-    }
+    // }
     
+
+
    /**
     * @dev Called after oracle has updated flight status
     *
@@ -136,8 +362,9 @@ contract FlightSuretyApp {
                                     uint8 statusCode
                                 )
                                 internal
-                                pure
     {
+        bytes32 key = getFlightKey(airline, flight, timestamp);
+        flightSuretyData.setFlightStatus(key, statusCode);
     }
 
 
@@ -334,4 +561,29 @@ contract FlightSuretyApp {
 
 // endregion
 
+
 }   
+
+/********************************************************************************************/
+/*                                SMART CONTRACT DATA FUNCTIONS                             */
+/********************************************************************************************/
+contract FlightSuretyData {
+    function getRegistrationCount() external returns(uint256);
+    function isRegisteredAirline(address airlineAddress)  external returns(bool registered, bool hasPaid, uint256 votes);
+    function changeRegistration(address newAirline, bool registrationState) external;
+    function addVote(address votedAirline, address voter) external;
+    function getConsensusCount() external returns(uint256);
+    function payFee(address payingAirline) external payable;
+    function hasAlreadyVoted(address newAirline, address voter) external returns(bool);
+    function addRegisteredFlight(bytes32 key, uint256 price, uint256 time) external;
+    function buy(bytes32 key,address passenger, bool withInsurance) external payable;
+    function pay(address passenger) external;
+    function isInsured(bytes32 key, address passenger) external returns(bool);
+    function getTicketPriceWithInsurance(bytes32 key) external returns(uint256 ticketPrice, uint256 ticketPriceWithInsurance);
+    function fund(bytes32 key , address passenger) public;
+    function creditInsurees(address passenger) external returns (uint256);
+    function setFlightStatus(bytes32 key, uint256 status) external;
+    function getFlight(bytes32 key) external returns(bool exist, uint256 status, bool registered, uint256 departuretime, uint256 price);
+    function isOperational() external returns(bool);
+    function hasPaid(address airlineAddress) external returns(bool);
+}

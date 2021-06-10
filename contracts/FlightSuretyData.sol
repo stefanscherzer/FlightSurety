@@ -14,7 +14,7 @@ contract FlightSuretyData {
 
     uint256 public registeredCount = 0;
 
-    uint256 public constant AirlineRegistrationFee = 10 ether;
+    uint256 public constant InsuranceFee = 1 ether;
 
     struct airline {
       bool registered;
@@ -281,7 +281,7 @@ contract FlightSuretyData {
                                     flightExists(key)
                                     returns(uint256 ticketPrice, uint256 ticketPriceWithInsurance)
     {
-        uint256 priceWithInsurance = flights[key].price.add(AirlineRegistrationFee);
+        uint256 priceWithInsurance = flights[key].price.add(InsuranceFee);
         return (
                 flights[key].price, 
                 priceWithInsurance

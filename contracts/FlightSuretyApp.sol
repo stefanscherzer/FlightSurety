@@ -248,31 +248,29 @@ contract FlightSuretyApp {
     function buyTicket
                     (
                         string flight,
-                        uint256 timestamp, 
+                        uint256 timestamp,
                         address airline,
                         bool insured
-                    ) 
-                    external 
+                    )
+                    external
                     payable
                     requireIsOperational
     {
-        uint256  amountToReturn;
         bytes32 key = getFlightKey(airline, flight, timestamp);
         (uint256 ticketPrice, uint256 ticketPriceInsured) = flightSuretyData.getTicketPriceWithInsurance(key);
 
-        if (insured == true) {
-            require (msg.value >= ticketPriceInsured, "Need more Ether to buy ticket with insurance");
-            amountToReturn = msg.value.sub(ticketPriceInsured);
+        uint256 price = (insured == true ? ticketPriceInsured : ticketPrice);
+
+        require (msg.value >= price, "Need more Ether to buy ticket");
+
+        uint256 amountToReturn = msg.value.sub(price);
+        if (amountToReturn > 0) {
             msg.sender.transfer(amountToReturn);
-            address(flightSuretyData).transfer(ticketPriceInsured);
-            flightSuretyData.buy(key,msg.sender,insured);
-        } else {
-            require (msg.value >= ticketPrice, "Need more Ether to buy ticket");
-            amountToReturn = msg.value.sub(ticketPrice);
-            msg.sender.transfer(amountToReturn);
-            address(flightSuretyData).transfer(ticketPrice);
-            flightSuretyData.buy(key,msg.sender,insured);
         }
+        
+        // require(address(this).balance >=price, "Contract underfunded");
+        address(flightSuretyData).transfer(price);
+        flightSuretyData.buy(key, msg.sender, insured);
     }
 
     function receiveCredit() 

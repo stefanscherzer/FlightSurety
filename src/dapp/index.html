@@ -20,12 +20,20 @@
     </nav>
 
     <main class="container">
-
-        <div id="display-wrapper" class="top-20">
+        <div id="display-wrapper" class="top-20"></div>
+        <div class="row top-20">
+            <label class="form"></label> 
+            <select id="flights-dropdown">
+                <option value="">Flight</option>
+            </select>
+            <btn class="btn btn-primary" id="submit-oracle">Submit to Oracles</btn>
+            <input type="hidden" id="flightName"></input>
+            <input type="hidden" id="departure"></input>
         </div>
         <div class="row top-20">
-            <label class="form">Flight</label> <input type="text" id="flight-number"> <btn class="btn btn-primary" id="submit-oracle">Submit to Oracles</btn>
+            <label class="form">ether</label> <input type="number" id="ether" value="0.1"></input> <btn class="btn btn-primary" id="purchase-insurance">Purchase Insurance</btn>
         </div>
+
     </main>
 
 </body>

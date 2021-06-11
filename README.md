@@ -41,6 +41,53 @@ To build dapp for prod:
 Deploy the contents of the ./dapp folder
 
 
+## Hints
+
+During testing with `truffle test` I got the following error:  
+"Error: the tx doesn't have the correct nonce. account has nonce of: 10 tx has nonce of: 9"
+
+I was able to solve this by changing the truffle config in `truffle.js` from 
+
+```js
+var HDWalletProvider = require("truffle-hdwallet-provider");
+var mnemonic = "candy maple cake sugar pudding cream honey rich smooth crumble sweet treat";
+
+module.exports = {
+  networks: {
+    development: {
+      provider: function() {
+        return new HDWalletProvider(mnemonic, "http://127.0.0.1:8545/", 0, 50);
+      },
+      network_id: '*'
+    }
+  },
+  compilers: {
+    solc: {
+      version: "^0.5.0"
+    }
+  }
+};
+```
+
+to  
+
+```js
+module.exports = {
+  networks: {
+    development: {
+      host: "127.0.0.1",     // Localhost
+      port: 8545,            // Standard Ganache UI port
+      network_id: '*'
+    }
+  },
+  compilers: {
+    solc: {
+      version: "^0.5.0"
+    }
+  }
+};
+```
+
 ## Resources
 
 * [How does Ethereum work anyway?](https://medium.com/@preethikasireddy/how-does-ethereum-work-anyway-22d1df506369)
